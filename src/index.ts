@@ -1,4 +1,5 @@
-require('dotenv').config()
+import * as dotenv from 'dotenv'
+dotenv.config()
 
 import {
   LCDClient,
@@ -12,12 +13,12 @@ import {
   Numeric,
 } from '@terra-money/terra.js'
 
-import { promisify } from 'util';
+import { promisify } from 'util'
 import axios from 'axios'
 import * as http from 'http'
 import * as https from 'https'
 import * as Bluebird from 'bluebird'
-import * as redis from 'redis';
+import * as redis from 'redis'
 
 const ax = axios.create({
   httpAgent: new http.Agent({ keepAlive: true }),
@@ -33,20 +34,27 @@ const SWAP_TO_DENOM = process.env.SWAP_TO_DENOM as string
 const NODE_URL = process.env.NODE_URL as string
 const CHAIN_ID = process.env.CHAIN_ID as string
 const SLACK_NOTIFICATION_URL = process.env.SLACK_NOTIFICATION_URL as string
-const REDIS_URL = process.env.REDIS_URL as string;
+const REDIS_URL = process.env.REDIS_URL as string
 
-const REDIS_PREFIX = 'swapper_';
-const REDIS_LAST_HEIGHT = 'last_height';
+const REDIS_PREFIX = 'swapper_'
+const REDIS_LAST_HEIGHT = 'last_height'
 
-const redisClient = redis.createClient(REDIS_URL, { prefix: REDIS_PREFIX });
-const getAsync: (key: string) => Promise<string | null>= promisify(redisClient.get).bind(redisClient);
-const setAsync: (key: string, val: string) => Promise<unknown> = promisify(redisClient.set).bind(redisClient);
+const redisClient = redis.createClient(REDIS_URL, { prefix: REDIS_PREFIX })
+const getAsync: (key: string) => Promise<string | null> = promisify(redisClient.get).bind(
+  redisClient
+)
+const setAsync: (key: string, val: string) => Promise<unknown> = promisify(redisClient.set).bind(
+  redisClient
+)
 
 async function load_block_height(client: LCDClient): Promise<number> {
   const blockInfo = await client.tendermint.blockInfo()
   return parseInt(blockInfo.block.header.height)
 }
-async function load_swap_token_balance(client: LCDClient, address: AccAddress): Promise<Numeric.Output> {
+async function load_swap_token_balance(
+  client: LCDClient,
+  address: AccAddress
+): Promise<Numeric.Output> {
   const balance = (await client.bank.balance(address))[0].get(SWAP_FROM_DENOM)
   if (balance) {
     return balance.amount
@@ -54,6 +62,7 @@ async function load_swap_token_balance(client: LCDClient, address: AccAddress): 
 
   return Numeric.parse(0)
 }
+
 async function create_swap_tx(wallet: Wallet, balance: Numeric.Output): Promise<Tx> {
   return await wallet.createAndSignTx({
     msgs: [
@@ -71,13 +80,13 @@ async function create_swap_tx(wallet: Wallet, balance: Numeric.Output): Promise<
 
 async function operation(client: LCDClient, wallet: Wallet) {
   const height = await load_block_height(client)
-  const lastHeight = parseInt(await getAsync(REDIS_LAST_HEIGHT) || "0");
+  const lastHeight = parseInt((await getAsync(REDIS_LAST_HEIGHT)) || '0')
   if (height <= lastHeight || (height + 1) % SWAP_INTERVAL !== 0) {
     return
   }
-  
+
   // set to prevent duplicated execution
-  await setAsync(REDIS_LAST_HEIGHT, height.toFixed());
+  await setAsync(REDIS_LAST_HEIGHT, height.toFixed())
 
   const balance = await load_swap_token_balance(client, wallet.key.accAddress)
   if (balance.isZero()) {
@@ -89,8 +98,8 @@ async function operation(client: LCDClient, wallet: Wallet) {
   if (isTxError(result)) {
     throw new Error(`Failed with Error Code: ${result.code} and Error Log: ${result.raw_log}`)
   }
-  
-  const txHeight = await validateTx(client, result.txhash);
+
+  const txHeight = await validateTx(client, result.txhash)
   console.info(`Tx Broadcasted => hash: ${result.txhash}, height: ${txHeight}`)
 }
 
