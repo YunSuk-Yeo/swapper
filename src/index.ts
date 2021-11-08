@@ -46,7 +46,7 @@ async function load_block_height(client: LCDClient): Promise<number> {
   const blockInfo = await client.tendermint.blockInfo()
   return parseInt(blockInfo.block.header.height)
 }
-async function load_uluna_balance(client: LCDClient, address: AccAddress): Promise<Numeric.Output> {
+async function load_swap_token_balance(client: LCDClient, address: AccAddress): Promise<Numeric.Output> {
   const balance = (await client.bank.balance(address))[0].get(SWAP_FROM_DENOM)
   if (balance) {
     return balance.amount
@@ -79,7 +79,7 @@ async function operation(client: LCDClient, wallet: Wallet) {
   // set to prevent duplicated execution
   await setAsync(REDIS_LAST_HEIGHT, height.toFixed());
 
-  const balance = await load_uluna_balance(client, wallet.key.accAddress)
+  const balance = await load_swap_token_balance(client, wallet.key.accAddress)
   if (balance.isZero()) {
     return
   }
