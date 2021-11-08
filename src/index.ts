@@ -51,13 +51,16 @@ async function load_block_height(client: LCDClient): Promise<number> {
   const blockInfo = await client.tendermint.blockInfo()
   return parseInt(blockInfo.block.header.height)
 }
+
+const MIN_AMOUNT = 1_000_000;
 async function load_swap_token_balance(
   client: LCDClient,
   address: AccAddress
 ): Promise<Numeric.Output> {
   const balance = (await client.bank.balance(address))[0].get(SWAP_FROM_DENOM)
-  if (balance) {
-    return balance.amount
+  if (balance && balance.amount.greaterThan(MIN_AMOUNT)) {
+    // left MIN_AMOUNT amount for fee
+    return balance.amount.sub(MIN_AMOUNT)
   }
 
   return Numeric.parse(0)
